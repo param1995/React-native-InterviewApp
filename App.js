@@ -12,6 +12,7 @@ import CandidateDashboard from "./src/screens/CandidateDashboard";
 import RecordAnswer from "./src/screens/RecordAnswer";
 import ReviewerDashboard from "./src/screens/ReviewerDashboard";
 import ReviewSubmission from "./src/screens/ReviewSubmission";
+import TaskDashboard from "./src/screens/TaskDashboard";
 
 const Stack = createNativeStackNavigator();
 
@@ -50,6 +51,7 @@ export default function App() {
         <Stack.Screen name="RecordAnswer" component={RecordAnswer} />
         <Stack.Screen name="Reviewer" component={ReviewerDashboard} />
         <Stack.Screen name="ReviewSubmission" component={ReviewSubmission} />
+        <Stack.Screen name="TaskDashboard" component={TaskDashboard} />
       </Stack.Navigator>
     </NavigationContainer>
   );
