@@ -33,8 +33,22 @@ export default function RecordAnswer({ route, navigation }) {
   const [answers, setAnswers] = useState([]);
   const [recordingStates, setRecordingStates] = useState({});
   const [sound, setSound] = useState(null);
+  const [isRecordingSupported, setIsRecordingSupported] = useState(true);
 
   useEffect(() => {
+    // Check if audio recording is supported
+    const checkRecordingSupport = async () => {
+      try {
+        const permission = await Audio.getPermissionsAsync();
+        setIsRecordingSupported(permission.status === 'granted' || permission.canAskAgain);
+      } catch (error) {
+        console.warn('Audio recording support check failed:', error);
+        setIsRecordingSupported(false);
+      }
+    };
+
+    checkRecordingSupport();
+
     return () => {
       if (sound) {
         sound.unloadAsync();
@@ -44,17 +58,19 @@ export default function RecordAnswer({ route, navigation }) {
 
   async function startRecording(questionIndex) {
     try {
-      // Stop any existing recording
+      // Stop any existing recording first
       if (recording) {
         await stopRecording();
       }
 
+      console.log("Requesting microphone permission...");
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert("Permission Required", "Microphone access is required to record answers.");
+        Alert.alert("Permission Required", "Microphone access is required to record answers. Please enable microphone permissions in your device settings.");
         return;
       }
 
+      console.log("Setting audio mode...");
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
@@ -64,25 +80,45 @@ export default function RecordAnswer({ route, navigation }) {
         playThroughEarpieceAndroid: false,
       });
 
+      console.log("Creating recording object...");
       const rec = new Audio.Recording();
+
+      console.log("Preparing to record...");
       await rec.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+
+      console.log("Starting recording...");
       await rec.startAsync();
 
       setRecording(rec);
       setCurrentQuestionIndex(questionIndex);
       setRecordingStates(prev => ({ ...prev, [questionIndex]: 'recording' }));
+
+      console.log("Recording started successfully");
     } catch (e) {
-      Alert.alert("Recording Error", "Failed to start recording. Please try again.");
-      console.error(e);
+      console.error("Recording start error:", e);
+      Alert.alert("Recording Error", `Failed to start recording: ${e.message}. Please check your microphone permissions and try again.`);
     }
   }
 
   async function stopRecording() {
     try {
-      if (!recording) return;
+      if (!recording) {
+        console.log("No active recording to stop");
+        return;
+      }
 
+      console.log("Stopping recording...");
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
+
+      if (!uri) {
+        Alert.alert("Recording Error", "No recording data found. Please try recording again.");
+        setRecording(null);
+        setCurrentQuestionIndex(null);
+        return;
+      }
+
+      console.log("Recording stopped, URI:", uri);
 
       setRecording(null);
       setRecordingStates(prev => ({ ...prev, [currentQuestionIndex]: 'recorded' }));
@@ -92,6 +128,7 @@ export default function RecordAnswer({ route, navigation }) {
 
       if (existingAnswerIndex !== -1) {
         // Update existing answer
+        console.log("Updating existing answer for question", currentQuestionIndex);
         setAnswers(prev => prev.map((answer, index) =>
           index === existingAnswerIndex
             ? { ...answer, uri, recordedAt: Date.now() }
@@ -99,6 +136,7 @@ export default function RecordAnswer({ route, navigation }) {
         ));
       } else {
         // Add new answer
+        console.log("Adding new answer for question", currentQuestionIndex);
         setAnswers(prev => [...prev, {
           id: uuidv4(),
           qIndex: currentQuestionIndex,
@@ -108,9 +146,13 @@ export default function RecordAnswer({ route, navigation }) {
       }
 
       setCurrentQuestionIndex(null);
+      console.log("Recording stopped successfully");
     } catch (e) {
-      Alert.alert("Recording Error", "Failed to stop recording. Please try again.");
-      console.error(e);
+      console.error("Recording stop error:", e);
+      Alert.alert("Recording Error", `Failed to stop recording: ${e.message}. Please try again.`);
+      // Reset recording state on error
+      setRecording(null);
+      setCurrentQuestionIndex(null);
     }
   }
 
@@ -216,17 +258,20 @@ export default function RecordAnswer({ route, navigation }) {
               style={[
                 styles.recordButton,
                 responsiveStyles.recordButton,
-                isRecorded && styles.reRecordButton
+                isRecorded && styles.reRecordButton,
+                !isRecordingSupported && styles.disabledButton
               ]}
               onPress={() => startRecording(index)}
               activeOpacity={0.8}
+              disabled={!isRecordingSupported}
             >
               <Text style={[
                 styles.recordButtonText,
                 responsiveStyles.recordButtonText,
-                isRecorded && styles.reRecordButtonText
+                isRecorded && styles.reRecordButtonText,
+                !isRecordingSupported && styles.disabledButtonText
               ]}>
-                {isRecorded ? '🎤 Re-record' : '🎤 Record Answer'}
+                {!isRecordingSupported ? '❌ Not Supported' : isRecorded ? '🎤 Re-record' : '🎤 Record Answer'}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -293,6 +338,11 @@ export default function RecordAnswer({ route, navigation }) {
               <Text style={[styles.progressText, responsiveStyles.progressText]}>
                 Progress: {recordedCount}/{totalQuestions} questions recorded
               </Text>
+              {!isRecordingSupported && (
+                <Text style={[styles.warningText, responsiveStyles.warningText]}>
+                  ⚠️ Audio recording may not be supported on this device
+                </Text>
+              )}
             </View>
 
             {/* Progress Bar */}
@@ -370,6 +420,10 @@ const getResponsiveStyles = () => {
     },
     progressText: {
       fontSize: isDesktop ? 16 : isTablet ? 15 : 14,
+    },
+    warningText: {
+      fontSize: isDesktop ? 14 : isTablet ? 13 : 12,
+      marginTop: 4,
     },
     progressContainer: {
       height: isTablet ? 8 : 6,
@@ -463,6 +517,12 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontWeight: "500",
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+  },
+  warningText: {
+    color: "#F59E0B",
+    fontWeight: "500",
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+    textAlign: "center",
   },
   progressContainer: {
     backgroundColor: "#334155",
