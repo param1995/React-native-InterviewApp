@@ -32,10 +32,8 @@ export default function CandidateDashboard({ navigation }) {
       try {
         const data = await storage.getInterviews();
         setInterviews(data || []);
-
-        // Check which interviews have been completed by this candidate
         const submissions = await storage.getSubmissions();
-        const userId = "candidate@test.com"; // In a real app, get from auth
+        const userId = "candidate@test.com";
         const completed = new Set(
           submissions
             .filter((sub) => sub.candidateId === userId)
@@ -52,11 +50,12 @@ export default function CandidateDashboard({ navigation }) {
 
   const renderItem = ({ item }) => {
     const isCompleted = completedInterviews.has(item.id);
-
     return (
       <View style={[styles.interviewCard, responsiveStyles.interviewCard]}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.title, responsiveStyles.title]}>{item.title}</Text>
+          <Text style={[styles.title, responsiveStyles.title]}>
+            {item.title}
+          </Text>
           {isCompleted && (
             <View style={styles.completedBadge}>
               <Text style={styles.completedBadgeText}>✅ Completed</Text>
@@ -67,7 +66,8 @@ export default function CandidateDashboard({ navigation }) {
           {item.description}
         </Text>
         <View style={styles.cardFooter}>
-          <Text style={[styles.questionsCount, responsiveStyles.questionsCount]}>
+          <Text
+            style={[styles.questionsCount, responsiveStyles.questionsCount]}>
             📋 {item.questions ? item.questions.length : 0} Questions
           </Text>
           <TouchableOpacity
@@ -76,16 +76,18 @@ export default function CandidateDashboard({ navigation }) {
               responsiveStyles.actionButton,
               isCompleted && styles.completedButton,
             ]}
-            onPress={() => navigation.navigate("RecordAnswer", { interview: item })}
-            activeOpacity={0.8}
-          >
+            onPress={() => {
+              console.log("Navigating to RecordAnswer with interview:", item);
+              console.log("Interview questions:", item.questions);
+              navigation.navigate("RecordAnswer", { interview: item });
+            }}
+            activeOpacity={0.8}>
             <Text
               style={[
                 styles.actionButtonText,
                 responsiveStyles.actionButtonText,
                 isCompleted && styles.completedButtonText,
-              ]}
-            >
+              ]}>
               {isCompleted ? "🎤 Re-record" : "🎤 Start Interview"}
             </Text>
           </TouchableOpacity>
@@ -96,70 +98,61 @@ export default function CandidateDashboard({ navigation }) {
 
   const responsiveStyles = getResponsiveStyles();
 
+  const renderHeader = () => (
+    <>
+      <View
+        style={[styles.backgroundGradient, responsiveStyles.backgroundGradient]}
+      />
+      <View style={[styles.content, responsiveStyles.content]}>
+        <View style={[styles.header, responsiveStyles.header]}>
+          <Text style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
+            🎯 Candidate Dashboard
+          </Text>
+          <Text
+            style={[styles.welcomeSubtitle, responsiveStyles.welcomeSubtitle]}>
+            Take interviews and showcase your skills
+          </Text>
+        </View>
+        {interviews.length > 0 && (
+          <View style={[styles.listContainer, responsiveStyles.listContainer]}>
+            <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+              Available Interviews ({interviews.length})
+            </Text>
+          </View>
+        )}
+      </View>
+    </>
+  );
+
+  const renderEmpty = () => (
+    <View style={[styles.emptyState, responsiveStyles.emptyState]}>
+      <Text style={[styles.emptyStateEmoji, responsiveStyles.emptyStateEmoji]}>
+        📝
+      </Text>
+      <Text style={[styles.emptyStateTitle, responsiveStyles.emptyStateTitle]}>
+        No Interviews Available
+      </Text>
+      <Text style={[styles.emptyStateText, responsiveStyles.emptyStateText]}>
+        Check back later for new interview opportunities.
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, responsiveStyles.container]}>
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            responsiveStyles.scrollContent,
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Background Gradient Effect */}
-          <View
-            style={[
-              styles.backgroundGradient,
-              responsiveStyles.backgroundGradient,
-            ]}
-          />
-
-          {/* Main Content */}
-          <View style={[styles.content, responsiveStyles.content]}>
-            {/* Header Section */}
-            <View style={[styles.header, responsiveStyles.header]}>
-              <Text style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
-                🎯 Candidate Dashboard
-              </Text>
-              <Text style={[styles.welcomeSubtitle, responsiveStyles.welcomeSubtitle]}>
-                Take interviews and showcase your skills
-              </Text>
-            </View>
-
-            {/* Interviews List */}
-            {interviews.length === 0 ? (
-              <View style={[styles.emptyState, responsiveStyles.emptyState]}>
-                <Text style={[styles.emptyStateEmoji, responsiveStyles.emptyStateEmoji]}>
-                  📝
-                </Text>
-                <Text style={[styles.emptyStateTitle, responsiveStyles.emptyStateTitle]}>
-                  No Interviews Available
-                </Text>
-                <Text style={[styles.emptyStateText, responsiveStyles.emptyStateText]}>
-                  Check back later for new interview opportunities.
-                </Text>
-              </View>
-            ) : (
-              <View style={[styles.listContainer, responsiveStyles.listContainer]}>
-                <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
-                  Available Interviews ({interviews.length})
-                </Text>
-                <FlatList
-                  data={interviews}
-                  keyExtractor={(i) => i.id.toString()}
-                  renderItem={renderItem}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.flatListContent}
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <FlatList
+        data={interviews}
+        keyExtractor={(i) => i.id.toString()}
+        renderItem={renderItem}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={[
+          styles.scrollContent,
+          responsiveStyles.scrollContent,
+        ]}
+        showsVerticalScrollIndicator={interviews.length > 2}
+        keyboardShouldPersistTaps="handled"
+      />
     </SafeAreaView>
   );
 }
@@ -187,11 +180,13 @@ const getResponsiveStyles = () => {
       alignItems: "center",
     },
     welcomeTitle: {
-      fontSize: isDesktop ? 38 : isTablet ? 32 : isSmallPhone ? 26 : 28,
+      fontSize: isDesktop ? 38 : isTablet ? 20 : isSmallPhone ? 20 : 20,
       marginBottom: isTablet ? 12 : 8,
+      display: "flex",
     },
     welcomeSubtitle: {
       fontSize: isDesktop ? 18 : isTablet ? 17 : isSmallPhone ? 14 : 16,
+      textAlign: "center",
     },
     emptyState: {
       alignItems: "center",
@@ -216,11 +211,13 @@ const getResponsiveStyles = () => {
     sectionTitle: {
       fontSize: isDesktop ? 20 : isTablet ? 18 : 16,
       marginBottom: isTablet ? 20 : 16,
+      textAlign: "center",
     },
     interviewCard: {
       paddingHorizontal: isDesktop ? 24 : isTablet ? 20 : 16,
       paddingVertical: isDesktop ? 20 : isTablet ? 18 : 16,
       marginBottom: isTablet ? 16 : 12,
+      width: "270",
     },
     title: {
       fontSize: isDesktop ? 18 : isTablet ? 17 : 16,
@@ -312,7 +309,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
   },
   flatListContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   interviewCard: {
     backgroundColor: "#1E293B",

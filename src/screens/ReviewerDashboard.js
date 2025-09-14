@@ -26,14 +26,11 @@ const isSmallPhone = width < 375;
 export default function ReviewerDashboard({ navigation }) {
   const [submissions, setSubmissions] = useState([]);
   const [interviews, setInterviews] = useState([]);
-
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
       try {
         const subs = await storage.getSubmissions();
         const ints = await storage.getInterviews();
-
-        // Enrich submissions with interview data
         const enrichedSubs = subs.map((sub) => {
           const interview = ints.find((i) => i.id === sub.interviewId);
           return {
@@ -55,11 +52,10 @@ export default function ReviewerDashboard({ navigation }) {
 
   const getStatusColor = (submission) => {
     if (submission.review) {
-      return "#10B981"; // Green for reviewed
+      return "#10B981";
     }
-    return "#F59E0B"; // Orange for pending
+    return "#F59E0B";
   };
-
   const getStatusText = (submission) => {
     if (submission.review) {
       return `✅ Reviewed (${submission.review.score}/10)`;
@@ -77,12 +73,15 @@ export default function ReviewerDashboard({ navigation }) {
           style={[
             styles.statusBadge,
             { backgroundColor: getStatusColor(item) },
-          ]}
-        >
+          ]}>
           <Text style={styles.statusBadgeText}>{getStatusText(item)}</Text>
         </View>
       </View>
-      <Text style={[styles.interviewDescription, responsiveStyles.interviewDescription]}>
+      <Text
+        style={[
+          styles.interviewDescription,
+          responsiveStyles.interviewDescription,
+        ]}>
         {item.interviewDescription}
       </Text>
       <View style={styles.cardDetails}>
@@ -99,16 +98,16 @@ export default function ReviewerDashboard({ navigation }) {
           responsiveStyles.reviewButton,
           item.review && styles.reviewedButton,
         ]}
-        onPress={() => navigation.navigate("ReviewSubmission", { submission: item })}
-        activeOpacity={0.8}
-      >
+        onPress={() =>
+          navigation.navigate("ReviewSubmission", { submission: item })
+        }
+        activeOpacity={0.8}>
         <Text
           style={[
             styles.reviewButtonText,
             responsiveStyles.reviewButtonText,
             item.review && styles.reviewedButtonText,
-          ]}
-        >
+          ]}>
           {item.review ? "👁️ View Review" : "📝 Review Submission"}
         </Text>
       </TouchableOpacity>
@@ -116,24 +115,20 @@ export default function ReviewerDashboard({ navigation }) {
   );
 
   const responsiveStyles = getResponsiveStyles();
-
   const pendingCount = submissions.filter((s) => !s.review).length;
   const reviewedCount = submissions.filter((s) => s.review).length;
-
   return (
     <SafeAreaView style={[styles.container, responsiveStyles.container]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+        behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
             responsiveStyles.scrollContent,
           ]}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           {/* Background Gradient Effect */}
           <View
             style={[
@@ -144,18 +139,23 @@ export default function ReviewerDashboard({ navigation }) {
 
           {/* Main Content */}
           <View style={[styles.content, responsiveStyles.content]}>
-            {/* Header Section */}
             <View style={[styles.header, responsiveStyles.header]}>
-              <Text style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
+              <Text
+                style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
                 👨‍💼 Reviewer Dashboard
               </Text>
-              <Text style={[styles.welcomeSubtitle, responsiveStyles.welcomeSubtitle]}>
+              <Text
+                style={[
+                  styles.welcomeSubtitle,
+                  responsiveStyles.welcomeSubtitle,
+                ]}>
                 Evaluate candidate submissions and provide feedback
               </Text>
             </View>
 
             {/* Stats Section */}
-            <View style={[styles.statsContainer, responsiveStyles.statsContainer]}>
+            <View
+              style={[styles.statsContainer, responsiveStyles.statsContainer]}>
               <View style={[styles.statCard, responsiveStyles.statCard]}>
                 <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
                   {pendingCount}
@@ -173,31 +173,46 @@ export default function ReviewerDashboard({ navigation }) {
                 </Text>
               </View>
             </View>
-
-            {/* Submissions List */}
             {submissions.length === 0 ? (
               <View style={[styles.emptyState, responsiveStyles.emptyState]}>
-                <Text style={[styles.emptyStateEmoji, responsiveStyles.emptyStateEmoji]}>
+                <Text
+                  style={[
+                    styles.emptyStateEmoji,
+                    responsiveStyles.emptyStateEmoji,
+                  ]}>
                   📋
                 </Text>
-                <Text style={[styles.emptyStateTitle, responsiveStyles.emptyStateTitle]}>
+                <Text
+                  style={[
+                    styles.emptyStateTitle,
+                    responsiveStyles.emptyStateTitle,
+                  ]}>
                   No Submissions Yet
                 </Text>
-                <Text style={[styles.emptyStateText, responsiveStyles.emptyStateText]}>
-                  Submissions will appear here once candidates complete interviews.
+                <Text
+                  style={[
+                    styles.emptyStateText,
+                    responsiveStyles.emptyStateText,
+                  ]}>
+                  Submissions will appear here once candidates complete
+                  interviews.
                 </Text>
               </View>
             ) : (
-              <View style={[styles.listContainer, responsiveStyles.listContainer]}>
-                <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+              <View
+                style={[styles.listContainer, responsiveStyles.listContainer]}>
+                <Text
+                  style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
                   All Submissions ({submissions.length})
                 </Text>
+
                 <FlatList
                   data={submissions}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={renderItem}
-                  showsVerticalScrollIndicator={false}
+                  showsVerticalScrollIndicator={true}
                   contentContainerStyle={styles.flatListContent}
+                  style={{ maxHeight: hp(60) }}
                 />
               </View>
             )}

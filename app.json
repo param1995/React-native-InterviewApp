@@ -1,8 +1,7 @@
 {
+  "permissions": ["MICROPHONE"],
   "android": {
     "package": "com.anonymous.interviewapp"
   },
-  "plugins": [
-    "expo-asset"
-  ]
+  "plugins": ["expo-asset"]
 }

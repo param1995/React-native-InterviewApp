@@ -15,26 +15,25 @@ export const interviewTaskManager = {
         title: interviewData.title,
         description: interviewData.description,
         questions: interviewData.questions,
-        assignedCandidates: [], // Array of candidate IDs
-        status: 'active', // 'active', 'completed', 'archived'
-        createdBy: interviewData.createdBy || 'admin@test.com',
+        assignedCandidates: [],
+        status: "active",
+        createdBy: interviewData.createdBy || "admin@test.com",
         createdAt: Date.now(),
         deadline: interviewData.deadline,
-        priority: interviewData.priority || 'medium', // 'low', 'medium', 'high'
+        priority: interviewData.priority || "medium",
         tags: interviewData.tags || [],
-        submissions: [], // Array of submission IDs
+        submissions: [],
         settings: {
-          allowMultipleSubmissions: interviewData.allowMultipleSubmissions || false,
+          allowMultipleSubmissions:
+            interviewData.allowMultipleSubmissions || false,
           requireAllQuestions: interviewData.requireAllQuestions || true,
-          timeLimit: interviewData.timeLimit, // in minutes
+          timeLimit: interviewData.timeLimit,
           autoGrade: interviewData.autoGrade || false,
         },
       };
 
       tasks.push(newTask);
       await AsyncStorage.setItem(INTERVIEW_TASKS_KEY, JSON.stringify(tasks));
-
-      // Also save to main interviews storage for backward compatibility
       const interviews = await storage.getInterviews();
       interviews.push({
         id: newTask.id,
@@ -46,7 +45,7 @@ export const interviewTaskManager = {
 
       return newTask;
     } catch (error) {
-      console.error('Error creating interview task:', error);
+      console.error("Error creating interview task:", error);
       throw error;
     }
   },
@@ -55,9 +54,9 @@ export const interviewTaskManager = {
   async getInterviewTasks() {
     try {
       const tasks = await AsyncStorage.getItem(INTERVIEW_TASKS_KEY);
-      return JSON.parse(tasks || '[]');
+      return JSON.parse(tasks || "[]");
     } catch (error) {
-      console.error('Error getting interview tasks:', error);
+      console.error("Error getting interview tasks:", error);
       return [];
     }
   },
@@ -65,14 +64,14 @@ export const interviewTaskManager = {
   // Get interview task by ID
   async getInterviewTaskById(taskId) {
     const tasks = await this.getInterviewTasks();
-    return tasks.find(task => task.id === taskId);
+    return tasks.find((task) => task.id === taskId);
   },
 
   // Update interview task
   async updateInterviewTask(taskId, updates) {
     try {
       const tasks = await this.getInterviewTasks();
-      const taskIndex = tasks.findIndex(task => task.id === taskId);
+      const taskIndex = tasks.findIndex((task) => task.id === taskId);
 
       if (taskIndex !== -1) {
         tasks[taskIndex] = {
@@ -85,7 +84,7 @@ export const interviewTaskManager = {
       }
       return null;
     } catch (error) {
-      console.error('Error updating interview task:', error);
+      console.error("Error updating interview task:", error);
       throw error;
     }
   },
@@ -94,10 +93,12 @@ export const interviewTaskManager = {
   async assignCandidates(taskId, candidateIds) {
     try {
       const task = await this.getInterviewTaskById(taskId);
-      if (!task) throw new Error('Interview task not found');
+      if (!task) throw new Error("Interview task not found");
 
       const updatedTask = await this.updateInterviewTask(taskId, {
-        assignedCandidates: [...new Set([...task.assignedCandidates, ...candidateIds])],
+        assignedCandidates: [
+          ...new Set([...task.assignedCandidates, ...candidateIds]),
+        ],
       });
 
       // Create notification tasks for assigned candidates
@@ -105,14 +106,14 @@ export const interviewTaskManager = {
         await taskManager.submitTask(TASK_TYPES.INTERVIEW_SUBMISSION, {
           taskId,
           candidateId,
-          type: 'assignment',
+          type: "assignment",
           message: `New interview task assigned: ${task.title}`,
         });
       }
 
       return updatedTask;
     } catch (error) {
-      console.error('Error assigning candidates:', error);
+      console.error("Error assigning candidates:", error);
       throw error;
     }
   },
@@ -121,7 +122,7 @@ export const interviewTaskManager = {
   async submitInterviewResponse(taskId, candidateId, answers) {
     try {
       const task = await this.getInterviewTaskById(taskId);
-      if (!task) throw new Error('Interview task not found');
+      if (!task) throw new Error("Interview task not found");
 
       // Create submission in main storage
       const submissions = await storage.getSubmissions();
@@ -145,13 +146,13 @@ export const interviewTaskManager = {
         taskId,
         candidateId,
         submissionId: newSubmission.id,
-        type: 'submission',
+        type: "submission",
         message: `Interview submitted: ${task.title}`,
       });
 
       return newSubmission;
     } catch (error) {
-      console.error('Error submitting interview response:', error);
+      console.error("Error submitting interview response:", error);
       throw error;
     }
   },
@@ -159,9 +160,10 @@ export const interviewTaskManager = {
   // Get tasks assigned to candidate
   async getTasksForCandidate(candidateId) {
     const tasks = await this.getInterviewTasks();
-    return tasks.filter(task =>
-      task.status === 'active' &&
-      task.assignedCandidates.includes(candidateId)
+    return tasks.filter(
+      (task) =>
+        task.status === "active" &&
+        task.assignedCandidates.includes(candidateId)
     );
   },
 
@@ -171,12 +173,12 @@ export const interviewTaskManager = {
     if (!task) return [];
 
     const allSubmissions = await storage.getSubmissions();
-    return allSubmissions.filter(sub => task.submissions.includes(sub.id));
+    return allSubmissions.filter((sub) => task.submissions.includes(sub.id));
   },
 
   // Archive completed task
   async archiveTask(taskId) {
-    return await this.updateInterviewTask(taskId, { status: 'archived' });
+    return await this.updateInterviewTask(taskId, { status: "archived" });
   },
 
   // Get task statistics
@@ -184,12 +186,18 @@ export const interviewTaskManager = {
     const tasks = await this.getInterviewTasks();
     const stats = {
       total: tasks.length,
-      active: tasks.filter(t => t.status === 'active').length,
-      completed: tasks.filter(t => t.status === 'completed').length,
-      archived: tasks.filter(t => t.status === 'archived').length,
-      highPriority: tasks.filter(t => t.priority === 'high').length,
-      totalAssignments: tasks.reduce((sum, task) => sum + task.assignedCandidates.length, 0),
-      totalSubmissions: tasks.reduce((sum, task) => sum + task.submissions.length, 0),
+      active: tasks.filter((t) => t.status === "active").length,
+      completed: tasks.filter((t) => t.status === "completed").length,
+      archived: tasks.filter((t) => t.status === "archived").length,
+      highPriority: tasks.filter((t) => t.priority === "high").length,
+      totalAssignments: tasks.reduce(
+        (sum, task) => sum + task.assignedCandidates.length,
+        0
+      ),
+      totalSubmissions: tasks.reduce(
+        (sum, task) => sum + task.submissions.length,
+        0
+      ),
     };
     return stats;
   },
@@ -199,10 +207,11 @@ export const interviewTaskManager = {
     const tasks = await this.getInterviewTasks();
     const lowercaseQuery = query.toLowerCase();
 
-    return tasks.filter(task =>
-      task.title.toLowerCase().includes(lowercaseQuery) ||
-      task.description.toLowerCase().includes(lowercaseQuery) ||
-      task.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
+    return tasks.filter(
+      (task) =>
+        task.title.toLowerCase().includes(lowercaseQuery) ||
+        task.description.toLowerCase().includes(lowercaseQuery) ||
+        task.tags.some((tag) => tag.toLowerCase().includes(lowercaseQuery))
     );
   },
 
@@ -211,10 +220,8 @@ export const interviewTaskManager = {
     const tasks = await this.getInterviewTasks();
     const now = Date.now();
 
-    return tasks.filter(task =>
-      task.status === 'active' &&
-      task.deadline &&
-      task.deadline < now
+    return tasks.filter(
+      (task) => task.status === "active" && task.deadline && task.deadline < now
     );
   },
 
@@ -248,16 +255,16 @@ export const interviewTaskManager = {
 
 // Interview task status constants
 export const INTERVIEW_TASK_STATUS = {
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  ARCHIVED: 'archived',
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  ARCHIVED: "archived",
 };
 
 // Priority levels
 export const PRIORITY_LEVELS = {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high',
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
 };
 
 // Default task settings

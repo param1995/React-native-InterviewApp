@@ -12,7 +12,10 @@ import {
   Alert,
 } from "react-native";
 import { taskManager, TASK_TYPES, TASK_STATUS } from "../services/taskManager";
-import { interviewTaskManager, INTERVIEW_TASK_STATUS } from "../services/interviewTaskManager";
+import {
+  interviewTaskManager,
+  INTERVIEW_TASK_STATUS,
+} from "../services/interviewTaskManager";
 
 const { width, height } = Dimensions.get("window");
 
@@ -45,15 +48,13 @@ export default function TaskDashboard({ navigation }) {
 
       setTaskStats(stats);
       setInterviewTaskStats(interviewStats);
-
-      // Get recent 5 tasks
       const recent = tasks
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, 5);
       setRecentTasks(recent);
     } catch (error) {
-      console.error('Error loading task data:', error);
-      Alert.alert('Error', 'Failed to load task data');
+      console.error("Error loading task data:", error);
+      Alert.alert("Error", "Failed to load task data");
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ export default function TaskDashboard({ navigation }) {
             try {
               const cleanedCount = await taskManager.cleanupOldTasks();
               Alert.alert("Success", `Cleaned up ${cleanedCount} old tasks`);
-              loadTaskData(); // Refresh data
+              loadTaskData();
             } catch (error) {
               Alert.alert("Error", "Failed to cleanup tasks");
             }
@@ -121,17 +122,14 @@ export default function TaskDashboard({ navigation }) {
     <SafeAreaView style={[styles.container, responsiveStyles.container]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+        behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
             responsiveStyles.scrollContent,
           ]}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Background Gradient Effect */}
+          keyboardShouldPersistTaps="handled">
           <View
             style={[
               styles.backgroundGradient,
@@ -141,25 +139,31 @@ export default function TaskDashboard({ navigation }) {
 
           {/* Main Content */}
           <View style={[styles.content, responsiveStyles.content]}>
-            {/* Header Section */}
             <View style={[styles.header, responsiveStyles.header]}>
-              <Text style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
+              <Text
+                style={[styles.welcomeTitle, responsiveStyles.welcomeTitle]}>
                 📊 Task Dashboard
               </Text>
-              <Text style={[styles.welcomeSubtitle, responsiveStyles.welcomeSubtitle]}>
+              <Text
+                style={[
+                  styles.welcomeSubtitle,
+                  responsiveStyles.welcomeSubtitle,
+                ]}>
                 Monitor and manage all interview tasks and submissions
               </Text>
             </View>
 
             {/* Task Statistics */}
             <View style={[styles.statsSection, responsiveStyles.statsSection]}>
-              <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+              <Text
+                style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
                 📈 Task Statistics
               </Text>
 
               <View style={[styles.statsGrid, responsiveStyles.statsGrid]}>
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {taskStats.total || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -168,7 +172,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {taskStats.pending || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -177,7 +182,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {taskStats.completed || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -186,7 +192,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {taskStats.failed || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -198,13 +205,15 @@ export default function TaskDashboard({ navigation }) {
 
             {/* Interview Task Statistics */}
             <View style={[styles.statsSection, responsiveStyles.statsSection]}>
-              <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+              <Text
+                style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
                 🎯 Interview Tasks
               </Text>
 
               <View style={[styles.statsGrid, responsiveStyles.statsGrid]}>
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {interviewTaskStats.total || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -213,7 +222,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {interviewTaskStats.active || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -222,7 +232,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {interviewTaskStats.totalAssignments || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -231,7 +242,8 @@ export default function TaskDashboard({ navigation }) {
                 </View>
 
                 <View style={[styles.statCard, responsiveStyles.statCard]}>
-                  <Text style={[styles.statNumber, responsiveStyles.statNumber]}>
+                  <Text
+                    style={[styles.statNumber, responsiveStyles.statNumber]}>
                     {interviewTaskStats.totalSubmissions || 0}
                   </Text>
                   <Text style={[styles.statLabel, responsiveStyles.statLabel]}>
@@ -242,31 +254,42 @@ export default function TaskDashboard({ navigation }) {
             </View>
 
             {/* Recent Tasks */}
-            <View style={[styles.recentTasksSection, responsiveStyles.recentTasksSection]}>
-              <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+            <View
+              style={[
+                styles.recentTasksSection,
+                responsiveStyles.recentTasksSection,
+              ]}>
+              <Text
+                style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
                 🕒 Recent Tasks
               </Text>
 
               {recentTasks.length > 0 ? (
                 recentTasks.map((task) => (
-                  <View key={task.id} style={[styles.taskCard, responsiveStyles.taskCard]}>
+                  <View
+                    key={task.id}
+                    style={[styles.taskCard, responsiveStyles.taskCard]}>
                     <View style={styles.taskHeader}>
-                      <Text style={[styles.taskType, responsiveStyles.taskType]}>
+                      <Text
+                        style={[styles.taskType, responsiveStyles.taskType]}>
                         {getTaskTypeLabel(task.type)}
                       </Text>
                       <View
                         style={[
                           styles.statusBadge,
                           { backgroundColor: getStatusColor(task.status) },
-                        ]}
-                      >
+                        ]}>
                         <Text style={styles.statusBadgeText}>
                           {task.status.toUpperCase()}
                         </Text>
                       </View>
                     </View>
-                    <Text style={[styles.taskMessage, responsiveStyles.taskMessage]}>
-                      {task.data?.message || 'Task created'}
+                    <Text
+                      style={[
+                        styles.taskMessage,
+                        responsiveStyles.taskMessage,
+                      ]}>
+                      {task.data?.message || "Task created"}
                     </Text>
                     <Text style={[styles.taskTime, responsiveStyles.taskTime]}>
                       {new Date(task.createdAt).toLocaleString()}
@@ -275,7 +298,11 @@ export default function TaskDashboard({ navigation }) {
                 ))
               ) : (
                 <View style={[styles.emptyState, responsiveStyles.emptyState]}>
-                  <Text style={[styles.emptyStateText, responsiveStyles.emptyStateText]}>
+                  <Text
+                    style={[
+                      styles.emptyStateText,
+                      responsiveStyles.emptyStateText,
+                    ]}>
                     No recent tasks found
                   </Text>
                 </View>
@@ -283,13 +310,17 @@ export default function TaskDashboard({ navigation }) {
             </View>
 
             {/* Action Buttons */}
-            <View style={[styles.actionsSection, responsiveStyles.actionsSection]}>
+            <View
+              style={[styles.actionsSection, responsiveStyles.actionsSection]}>
               <TouchableOpacity
                 style={[styles.actionButton, responsiveStyles.actionButton]}
                 onPress={handleCleanupTasks}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.actionButtonText, responsiveStyles.actionButtonText]}>
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    responsiveStyles.actionButtonText,
+                  ]}>
                   🧹 Cleanup Old Tasks
                 </Text>
               </TouchableOpacity>
@@ -297,9 +328,12 @@ export default function TaskDashboard({ navigation }) {
               <TouchableOpacity
                 style={[styles.actionButton, responsiveStyles.actionButton]}
                 onPress={loadTaskData}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.actionButtonText, responsiveStyles.actionButtonText]}>
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    responsiveStyles.actionButtonText,
+                  ]}>
                   🔄 Refresh Data
                 </Text>
               </TouchableOpacity>

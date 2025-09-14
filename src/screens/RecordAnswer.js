@@ -1,671 +1,274 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   FlatList,
   Alert,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  KeyboardAvoidingView,
+  PermissionsAndroid,
   Platform,
+  Linking,
+  StyleSheet,
   Dimensions,
 } from "react-native";
 import { Audio } from "expo-av";
 import { storage } from "../services/storage";
 import { v4 as uuidv4 } from "uuid";
 
+// Fallback id generator
+const generateId = () => {
+  try {
+    return uuidv4();
+  } catch (e) {
+    return `recording-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+};
+
 const { width, height } = Dimensions.get("window");
-
-// Responsive helper functions
-const wp = (percentage) => (width * percentage) / 100;
-const hp = (percentage) => (height * percentage) / 100;
-
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
 const isSmallPhone = width < 375;
 
 export default function RecordAnswer({ route, navigation }) {
   const { interview } = route.params;
-  const [recording, setRecording] = useState(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(null);
-  const [answers, setAnswers] = useState([]);
+
+  const [recordings, setRecordings] = useState([]);
+  const [currentRecording, setCurrentRecording] = useState(null);
   const [recordingStates, setRecordingStates] = useState({});
-  const [sound, setSound] = useState(null);
-  const [isRecordingSupported, setIsRecordingSupported] = useState(true);
 
-  useEffect(() => {
-    // Check if audio recording is supported
-    const checkRecordingSupport = async () => {
-      try {
-        const permission = await Audio.getPermissionsAsync();
-        setIsRecordingSupported(permission.status === 'granted' || permission.canAskAgain);
-      } catch (error) {
-        console.warn('Audio recording support check failed:', error);
-        setIsRecordingSupported(false);
-      }
-    };
-
-    checkRecordingSupport();
-
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  async function startRecording(questionIndex) {
+  // -------- Request Microphone Permission --------
+  async function requestAudioPermission() {
     try {
-      // Stop any existing recording first
-      if (recording) {
-        await stopRecording();
-      }
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status === "granted") return true;
 
-      console.log("Requesting microphone permission...");
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== "granted") {
-        Alert.alert("Permission Required", "Microphone access is required to record answers. Please enable microphone permissions in your device settings.");
-        return;
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: "Microphone Permission",
+            message:
+              "This app needs access to your microphone to record interview answers.",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK",
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
+      return false;
+    } catch (err) {
+      console.warn("Permission error:", err);
+      return false;
+    }
+  }
 
-      console.log("Setting audio mode...");
+  // -------- Start Recording --------
+  async function startRecording(questionIndex) {
+    const hasPermission = await requestAudioPermission();
+    if (!hasPermission) {
+      Alert.alert(
+        "Permission Denied",
+        "Microphone access is required. Please enable it in settings."
+      );
+      if (Platform.OS === "android") {
+        Linking.openSettings();
+      }
+      return;
+    }
+
+    try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
-        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
         playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-        playThroughEarpieceAndroid: false,
       });
 
-      console.log("Creating recording object...");
-      const rec = new Audio.Recording();
-
-      console.log("Preparing to record...");
-      await rec.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
-
-      console.log("Starting recording...");
-      await rec.startAsync();
-
-      setRecording(rec);
-      setCurrentQuestionIndex(questionIndex);
-      setRecordingStates(prev => ({ ...prev, [questionIndex]: 'recording' }));
-
-      console.log("Recording started successfully");
-    } catch (e) {
-      console.error("Recording start error:", e);
-      Alert.alert("Recording Error", `Failed to start recording: ${e.message}. Please check your microphone permissions and try again.`);
-    }
-  }
-
-  async function stopRecording() {
-    try {
-      if (!recording) {
-        console.log("No active recording to stop");
-        return;
-      }
-
-      console.log("Stopping recording...");
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-
-      if (!uri) {
-        Alert.alert("Recording Error", "No recording data found. Please try recording again.");
-        setRecording(null);
-        setCurrentQuestionIndex(null);
-        return;
-      }
-
-      console.log("Recording stopped, URI:", uri);
-
-      setRecording(null);
-      setRecordingStates(prev => ({ ...prev, [currentQuestionIndex]: 'recorded' }));
-
-      // Check if we already have an answer for this question
-      const existingAnswerIndex = answers.findIndex(a => a.qIndex === currentQuestionIndex);
-
-      if (existingAnswerIndex !== -1) {
-        // Update existing answer
-        console.log("Updating existing answer for question", currentQuestionIndex);
-        setAnswers(prev => prev.map((answer, index) =>
-          index === existingAnswerIndex
-            ? { ...answer, uri, recordedAt: Date.now() }
-            : answer
-        ));
-      } else {
-        // Add new answer
-        console.log("Adding new answer for question", currentQuestionIndex);
-        setAnswers(prev => [...prev, {
-          id: uuidv4(),
-          qIndex: currentQuestionIndex,
-          uri,
-          recordedAt: Date.now()
-        }]);
-      }
-
-      setCurrentQuestionIndex(null);
-      console.log("Recording stopped successfully");
-    } catch (e) {
-      console.error("Recording stop error:", e);
-      Alert.alert("Recording Error", `Failed to stop recording: ${e.message}. Please try again.`);
-      // Reset recording state on error
-      setRecording(null);
-      setCurrentQuestionIndex(null);
-    }
-  }
-
-  async function playRecording(uri) {
-    try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri });
-      setSound(newSound);
-      await newSound.playAsync();
-    } catch (e) {
-      Alert.alert("Playback Error", "Failed to play recording.");
-      console.error(e);
-    }
-  }
-
-  async function submit() {
-    if (answers.length === 0) {
-      Alert.alert("No Answers", "Please record at least one answer before submitting.");
-      return;
-    }
-
-    if (answers.length !== interview.questions.length) {
-      Alert.alert(
-        "Incomplete",
-        `You've recorded ${answers.length} out of ${interview.questions.length} questions. Continue anyway?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Submit",
-            onPress: () => submitAnswers(),
-          },
-        ]
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
-      return;
+      setCurrentRecording(recording);
+      setRecordingStates((prev) => ({ ...prev, [questionIndex]: "recording" }));
+    } catch (err) {
+      console.error("Failed to start recording:", err);
     }
-
-    submitAnswers();
   }
 
-  async function submitAnswers() {
+  // -------- Stop Recording --------
+  async function stopRecording(questionIndex) {
+    if (!currentRecording) return;
+
     try {
-      const subs = await storage.getSubmissions();
-      subs.push({
-        id: uuidv4(),
-        interviewId: interview.id,
-        candidateId: "candidate@test.com", // In a real app, get from auth context
-        submittedAt: Date.now(),
-        answers,
-      });
-      await storage.saveSubmissions(subs);
-      Alert.alert("Success!", "Your answers have been submitted successfully!", [
-        { text: "OK", onPress: () => navigation.goBack() }
-      ]);
-    } catch (e) {
-      Alert.alert("Submission Error", "Failed to submit answers. Please try again.");
-      console.error(e);
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+
+      const newRecordings = [
+        ...recordings,
+        { id: generateId(), questionIndex, uri },
+      ];
+      setRecordings(newRecordings);
+      setCurrentRecording(null);
+      setRecordingStates((prev) => ({ ...prev, [questionIndex]: "recorded" }));
+    } catch (err) {
+      console.error("Failed to stop recording:", err);
     }
   }
 
-  const getAnswerStatus = (questionIndex) => {
-    const answer = answers.find(a => a.qIndex === questionIndex);
-    if (answer) return 'recorded';
-    if (recordingStates[questionIndex] === 'recording') return 'recording';
-    return 'not_recorded';
+  // -------- Save Answer to Storage --------
+  async function saveAnswers() {
+    try {
+      const submissions = await storage.getSubmissions();
+      const newSubmission = {
+        id: generateId(),
+        interviewId: interview.id,
+        answers: recordings,
+        submittedAt: new Date().toISOString(),
+      };
+      await storage.saveSubmissions([...submissions, newSubmission]);
+      Alert.alert("✅ Success", "Your answers have been saved.");
+      navigation.goBack();
+    } catch (err) {
+      console.error("Error saving answers:", err);
+      Alert.alert("❌ Error", "Failed to save answers.");
+    }
+  }
+
+  const getRecordingStatus = (index) => {
+    return recordingStates[index] || "not_recorded";
   };
-
-  const renderQuestion = ({ item, index }) => {
-    const status = getAnswerStatus(index);
-    const isRecording = status === 'recording';
-    const isRecorded = status === 'recorded';
-
-    return (
-      <View style={[styles.questionCard, responsiveStyles.questionCard]}>
-        <View style={styles.questionHeader}>
-          <Text style={[styles.questionNumber, responsiveStyles.questionNumber]}>
-            Q{index + 1}
-          </Text>
-          <View style={[
-            styles.statusIndicator,
-            isRecorded && styles.recordedIndicator,
-            isRecording && styles.recordingIndicator
-          ]}>
-            <Text style={[
-              styles.statusText,
-              isRecorded && styles.recordedText,
-              isRecording && styles.recordingText
-            ]}>
-              {isRecording ? '🔴 REC' : isRecorded ? '✅ RECORDED' : '⏸️ READY'}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[styles.questionText, responsiveStyles.questionText]}>
-          {item}
-        </Text>
-
-        <View style={styles.controlsContainer}>
-          {!isRecording ? (
-            <TouchableOpacity
-              style={[
-                styles.recordButton,
-                responsiveStyles.recordButton,
-                isRecorded && styles.reRecordButton,
-                !isRecordingSupported && styles.disabledButton
-              ]}
-              onPress={() => startRecording(index)}
-              activeOpacity={0.8}
-              disabled={!isRecordingSupported}
-            >
-              <Text style={[
-                styles.recordButtonText,
-                responsiveStyles.recordButtonText,
-                isRecorded && styles.reRecordButtonText,
-                !isRecordingSupported && styles.disabledButtonText
-              ]}>
-                {!isRecordingSupported ? '❌ Not Supported' : isRecorded ? '🎤 Re-record' : '🎤 Record Answer'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.stopButton, responsiveStyles.stopButton]}
-              onPress={stopRecording}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.stopButtonText, responsiveStyles.stopButtonText]}>
-                ⏹️ Stop Recording
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {isRecorded && (
-            <TouchableOpacity
-              style={[styles.playButton, responsiveStyles.playButton]}
-              onPress={() => playRecording(answers.find(a => a.qIndex === index)?.uri)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.playButtonText, responsiveStyles.playButtonText]}>
-                ▶️ Play
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const responsiveStyles = getResponsiveStyles();
-  const recordedCount = answers.length;
-  const totalQuestions = interview.questions.length;
-
   return (
-    <SafeAreaView style={[styles.container, responsiveStyles.container]}>
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            responsiveStyles.scrollContent,
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Background Gradient Effect */}
-          <View
-            style={[
-              styles.backgroundGradient,
-              responsiveStyles.backgroundGradient,
-            ]}
-          />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{interview.title}</Text>
+        <Text style={styles.description}>{interview.description}</Text>
+      </View>
 
-          {/* Main Content */}
-          <View style={[styles.content, responsiveStyles.content]}>
-            {/* Header Section */}
-            <View style={[styles.header, responsiveStyles.header]}>
-              <Text style={[styles.interviewTitle, responsiveStyles.interviewTitle]}>
-                🎤 {interview.title}
+      <FlatList
+        data={interview.questions || []}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item, index }) => {
+          const status = getRecordingStatus(index);
+          return (
+            <View style={styles.questionCard}>
+              <Text style={styles.questionText}>
+                Q{index + 1}: {item}
               </Text>
-              <Text style={[styles.progressText, responsiveStyles.progressText]}>
-                Progress: {recordedCount}/{totalQuestions} questions recorded
-              </Text>
-              {!isRecordingSupported && (
-                <Text style={[styles.warningText, responsiveStyles.warningText]}>
-                  ⚠️ Audio recording may not be supported on this device
-                </Text>
-              )}
-            </View>
 
-            {/* Progress Bar */}
-            <View style={[styles.progressContainer, responsiveStyles.progressContainer]}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${(recordedCount / totalQuestions) * 100}%` }
-                ]}
-              />
+              <View style={styles.buttonContainer}>
+                {status !== "recording" ? (
+                  <TouchableOpacity
+                    style={[styles.button, styles.startButton]}
+                    onPress={() => startRecording(index)}>
+                    <Text style={styles.buttonText}>🎤 Start Recording</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.button, styles.stopButton]}
+                    onPress={() => stopRecording(index)}>
+                    <Text style={styles.buttonText}>⏹ Stop Recording</Text>
+                  </TouchableOpacity>
+                )}
+                {status === "recorded" && (
+                  <Text style={styles.recordedText}>✅ Recorded</Text>
+                )}
+              </View>
             </View>
-
-            {/* Questions List */}
-            <View style={[styles.questionsContainer, responsiveStyles.questionsContainer]}>
-              <FlatList
-                data={interview.questions}
-                keyExtractor={(q, i) => String(i)}
-                renderItem={renderQuestion}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.flatListContent}
-              />
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                responsiveStyles.submitButton,
-                recordedCount === 0 && styles.disabledButton
-              ]}
-              onPress={submit}
-              activeOpacity={0.8}
-              disabled={recordedCount === 0}
-            >
-              <Text style={[
-                styles.submitButtonText,
-                responsiveStyles.submitButtonText,
-                recordedCount === 0 && styles.disabledButtonText
-              ]}>
-                📤 Submit Answers ({recordedCount}/{totalQuestions})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          );
+        }}
+        contentContainerStyle={styles.listContainer}
+      />
+      <TouchableOpacity style={styles.saveButton} onPress={saveAnswers}>
+        <Text style={styles.saveButtonText}>💾 Save Answers</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
-
-// Responsive styles function
-const getResponsiveStyles = () => {
-  return StyleSheet.create({
-    container: {
-      paddingHorizontal: isDesktop ? wp(15) : isTablet ? wp(10) : wp(5),
-    },
-    scrollContent: {
-      minHeight: isDesktop ? "100%" : hp(100),
-      paddingVertical: isTablet ? hp(3) : hp(2),
-    },
-    backgroundGradient: {
-      width: isDesktop ? wp(70) : wp(90),
-      height: isDesktop ? hp(80) : hp(70),
-    },
-    content: {
-      maxWidth: isDesktop ? 500 : isTablet ? 450 : wp(90),
-      paddingHorizontal: isDesktop ? 40 : isTablet ? 32 : 24,
-    },
-    header: {
-      marginBottom: isTablet ? 24 : 20,
-      alignItems: "center",
-    },
-    interviewTitle: {
-      fontSize: isDesktop ? 32 : isTablet ? 28 : isSmallPhone ? 24 : 26,
-      marginBottom: isTablet ? 8 : 6,
-    },
-    progressText: {
-      fontSize: isDesktop ? 16 : isTablet ? 15 : 14,
-    },
-    warningText: {
-      fontSize: isDesktop ? 14 : isTablet ? 13 : 12,
-      marginTop: 4,
-    },
-    progressContainer: {
-      height: isTablet ? 8 : 6,
-      backgroundColor: "#334155",
-      borderRadius: 4,
-      marginBottom: isTablet ? 32 : 24,
-    },
-    questionsContainer: {
-      flex: 1,
-      marginBottom: isTablet ? 32 : 24,
-    },
-    questionCard: {
-      paddingHorizontal: isDesktop ? 24 : isTablet ? 20 : 16,
-      paddingVertical: isDesktop ? 20 : isTablet ? 18 : 16,
-      marginBottom: isTablet ? 16 : 12,
-    },
-    questionNumber: {
-      fontSize: isDesktop ? 16 : isTablet ? 15 : 14,
-    },
-    questionText: {
-      fontSize: isDesktop ? 16 : isTablet ? 15 : 14,
-      marginBottom: isTablet ? 16 : 12,
-    },
-    recordButton: {
-      paddingVertical: isDesktop ? 12 : isTablet ? 11 : 10,
-      paddingHorizontal: isDesktop ? 20 : isTablet ? 18 : 16,
-      marginRight: isTablet ? 12 : 10,
-    },
-    recordButtonText: {
-      fontSize: isDesktop ? 15 : isTablet ? 14 : 13,
-    },
-    stopButton: {
-      paddingVertical: isDesktop ? 12 : isTablet ? 11 : 10,
-      paddingHorizontal: isDesktop ? 20 : isTablet ? 18 : 16,
-    },
-    stopButtonText: {
-      fontSize: isDesktop ? 15 : isTablet ? 14 : 13,
-    },
-    playButton: {
-      paddingVertical: isDesktop ? 10 : isTablet ? 9 : 8,
-      paddingHorizontal: isDesktop ? 16 : isTablet ? 14 : 12,
-    },
-    playButtonText: {
-      fontSize: isDesktop ? 14 : isTablet ? 13 : 12,
-    },
-    submitButton: {
-      paddingVertical: isDesktop ? 18 : isTablet ? 16 : 14,
-      marginBottom: isTablet ? 20 : 16,
-    },
-    submitButtonText: {
-      fontSize: isDesktop ? 18 : isTablet ? 17 : 16,
-    },
-  });
-};
-
+const baseFontSize = isDesktop ? 18 : isTablet ? 16 : isSmallPhone ? 13 : 15;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backgroundGradient: {
-    position: "absolute",
-    backgroundColor: "#1E293B",
-    borderRadius: 200,
-    opacity: 0.3,
-    top: -100,
-    left: -50,
-  },
-  content: {
-    width: "100%",
-    alignSelf: "center",
+    backgroundColor: "#0D1B2A",
+    paddingHorizontal: isDesktop ? 50 : isTablet ? 30 : 20,
+    paddingTop: isSmallPhone ? 15 : 20,
   },
   header: {
+    marginBottom: isSmallPhone ? 15 : 20,
     alignItems: "center",
   },
-  interviewTitle: {
-    color: "#F8FAFC",
-    fontWeight: "700",
+  title: {
+    fontSize: isDesktop ? 28 : isTablet ? 24 : isSmallPhone ? 20 : 22,
+    fontWeight: "bold",
+    color: "#E0E1DD",
     textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+    marginBottom: 10,
   },
-  progressText: {
-    color: "#94A3B8",
-    fontWeight: "500",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  warningText: {
-    color: "#F59E0B",
-    fontWeight: "500",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+  description: {
+    fontSize: baseFontSize,
+    color: "#A9A9A9",
     textAlign: "center",
   },
-  progressContainer: {
-    backgroundColor: "#334155",
-    borderRadius: 4,
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#10B981",
-    borderRadius: 4,
-  },
-  questionsContainer: {
-    flex: 1,
-  },
-  flatListContent: {
-    paddingBottom: 10,
+
+  // Questions List
+  listContainer: {
+    paddingBottom: isSmallPhone ? 70 : 100,
   },
   questionCard: {
-    backgroundColor: "#1E293B",
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 15,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  questionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  questionNumber: {
-    color: "#3B82F6",
-    fontWeight: "700",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  statusIndicator: {
-    backgroundColor: "#64748B",
+    backgroundColor: "#1B263B",
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  recordedIndicator: {
-    backgroundColor: "#10B981",
-  },
-  recordedText: {
-    color: "#FFFFFF",
-  },
-  recordingIndicator: {
-    backgroundColor: "#EF4444",
-  },
-  recordingText: {
-    color: "#FFFFFF",
+    padding: isDesktop ? 22 : isTablet ? 18 : isSmallPhone ? 14 : 16,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#415A77",
   },
   questionText: {
-    color: "#F8FAFC",
-    fontWeight: "500",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-    lineHeight: 24,
+    fontSize: baseFontSize,
+    color: "#E0E1DD",
+    marginBottom: 15,
+    lineHeight: 22,
   },
-  controlsContainer: {
+
+  // Buttons
+  buttonContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
+    justifyContent: "space-between",
   },
-  recordButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 12,
+  button: {
+    paddingVertical: isSmallPhone ? 10 : 12,
+    paddingHorizontal: isSmallPhone ? 15 : 20,
+    borderRadius: 8,
     alignItems: "center",
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    flex: 1,
+    marginRight: 10,
   },
-  recordButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  reRecordButton: {
-    backgroundColor: "#F59E0B",
-  },
-  reRecordButtonText: {
-    color: "#FFFFFF",
+  startButton: {
+    backgroundColor: "#E94560",
   },
   stopButton: {
-    backgroundColor: "#EF4444",
-    borderRadius: 12,
-    alignItems: "center",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: "#1D3557",
   },
-  stopButtonText: {
+  buttonText: {
     color: "#FFFFFF",
+    fontSize: baseFontSize,
     fontWeight: "600",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
   },
-  playButton: {
-    backgroundColor: "#10B981",
-    borderRadius: 12,
+  recordedText: {
+    color: "#06D6A0",
+    fontSize: baseFontSize - 2,
+    fontWeight: "600",
+  },
+
+  // Save Button
+  saveButton: {
+    backgroundColor: "#06D6A0",
+    paddingVertical: isSmallPhone ? 12 : 15,
+    borderRadius: 10,
     alignItems: "center",
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    marginHorizontal: 20,
+    marginBottom: 20,
   },
-  playButtonText: {
+  saveButtonText: {
     color: "#FFFFFF",
-    fontWeight: "600",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  submitButton: {
-    backgroundColor: "#10B981",
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  submitButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-  },
-  disabledButton: {
-    backgroundColor: "#64748B",
-  },
-  disabledButtonText: {
-    color: "#94A3B8",
+    fontSize: isDesktop ? 20 : isTablet ? 18 : 16,
+    fontWeight: "bold",
   },
 });

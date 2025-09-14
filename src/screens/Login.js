@@ -17,13 +17,9 @@ import {
   ScrollView,
 } from "react-native";
 import { storage } from "../services/storage";
-
 const { width, height } = Dimensions.get("window");
-
-// Responsive helper functions
 const wp = (percentage) => (width * percentage) / 100;
 const hp = (percentage) => (height * percentage) / 100;
-
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
 const isSmallPhone = width < 375;
@@ -31,63 +27,126 @@ const isSmallPhone = width < 375;
 export default function Login({ navigation }) {
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
   async function handleLogin() {
+    console.log("Login attempt with id:", id, "pw length:", pw.length);
+    let hasError = false;
+    if (!id.trim()) {
+      console.log("Validation failed: Email is empty");
+      setEmailError("Please enter your email");
+      hasError = true;
+    } else if (!validateEmail(id.trim())) {
+      console.log("Validation failed: Invalid email format");
+      setEmailError("Please enter a valid email address");
+      hasError = true;
+    } else {
+      setEmailError("");
+    }
+
+    if (!pw) {
+      console.log("Validation failed: Password is empty");
+      setPasswordError("Please enter your password");
+      hasError = true;
+    } else {
+      setPasswordError("");
+    }
+    if (hasError) return;
     const users = await storage.getUsers();
     const u = users.find((x) => x.id === id.trim() && x.password === pw);
-    if (!u) return Alert.alert("Invalid credentials");
-
-    if (u.role === "admin") navigation.replace("Admin");
+    if (!u) {
+      console.log("Validation failed: Invalid credentials");
+      setPasswordError("Invalid email or password");
+      return;
+    }
+    console.log("Login successful for user:", u.id, "role:", u.role);
+    setEmailError("");
+    setPasswordError("");
+    if (u.role === "admin") navigation.replace("AdminDashboard");
     else if (u.role === "candidate") navigation.replace("Candidate");
     else navigation.replace("Reviewer");
   }
-
   const responsiveStyles = getResponsiveStyles();
-
   return (
     <SafeAreaView style={[styles.container, responsiveStyles.container]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
             responsiveStyles.scrollContent,
           ]}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          {/* Background Gradient Effect */}
+          keyboardShouldPersistTaps="handled"
+          bounces={true}
+          alwaysBounceVertical={false}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}>
           <View
             style={[
               styles.backgroundGradient,
               responsiveStyles.backgroundGradient,
             ]}
           />
-
-          {/* Main Content */}
           <View style={[styles.content, responsiveStyles.content]}>
-            {/* Login Card */}
             <View style={[styles.loginCard, responsiveStyles.loginCard]}>
               <TextInput
                 placeholder="Email or Username"
                 value={id}
-                onChangeText={setId}
+                onChangeText={(text) => {
+                  setId(text);
+                  setEmailError("");
+                  setPasswordError("");
+                }}
                 style={[styles.input, responsiveStyles.input]}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholderTextColor="#9CA3AF"
               />
+              {emailError ? (
+                <Text
+                  style={[
+                    styles.fieldError,
+                    responsiveStyles.fieldError,
+                    { marginBottom: 10 },
+                  ]}>
+                  {emailError}
+                </Text>
+              ) : null}
 
+              {/* Password Input */}
               <TextInput
                 placeholder="Password"
                 secureTextEntry
                 value={pw}
-                onChangeText={setPw}
+                onChangeText={(text) => {
+                  setPw(text);
+                  setEmailError("");
+                  setPasswordError("");
+                }}
                 style={[styles.input, responsiveStyles.input]}
                 placeholderTextColor="#9CA3AF"
               />
+              {passwordError ? (
+                <Text
+                  style={[
+                    styles.fieldError,
+                    responsiveStyles.fieldError,
+                    { marginBottom: 8 },
+                  ]}>
+                  {passwordError}
+                </Text>
+              ) : null}
 
+              {/* Login Button */}
               <TouchableOpacity
                 style={[styles.loginButton, responsiveStyles.loginButton]}
                 onPress={handleLogin}
@@ -101,6 +160,7 @@ export default function Login({ navigation }) {
                 </Text>
               </TouchableOpacity>
 
+              {/* Divider */}
               <View style={[styles.divider, responsiveStyles.divider]}>
                 <View style={styles.dividerLine} />
                 <Text
@@ -110,6 +170,7 @@ export default function Login({ navigation }) {
                 <View style={styles.dividerLine} />
               </View>
 
+              {/* Sign Up */}
               <TouchableOpacity
                 style={[styles.signupButton, responsiveStyles.signupButton]}
                 onPress={() => navigation.navigate("Signup")}
@@ -122,7 +183,7 @@ export default function Login({ navigation }) {
                   Sign Up
                 </Text>
               </TouchableOpacity>
-
+              {/* Forgot Password */}
               <TouchableOpacity
                 style={[styles.forgotButton, responsiveStyles.forgotButton]}
                 activeOpacity={0.7}>
@@ -135,51 +196,6 @@ export default function Login({ navigation }) {
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Test Accounts Section */}
-            {/* <View style={[styles.testSection, responsiveStyles.testSection]}>
-              <Text style={[styles.testTitle, responsiveStyles.testTitle]}>
-                🚀 Quick Test Accounts
-              </Text>
-              <View style={styles.testGrid}>
-                <View style={[styles.testCard, responsiveStyles.testCard]}>
-                  <Text style={[styles.testRole, responsiveStyles.testRole]}>
-                    👑 Admin
-                  </Text>
-                  <Text
-                    style={[
-                      styles.testCredentials,
-                      responsiveStyles.testCredentials,
-                    ]}>
-                    admin@test.com{"\n"}admin123
-                  </Text>
-                </View>
-                <View style={[styles.testCard, responsiveStyles.testCard]}>
-                  <Text style={[styles.testRole, responsiveStyles.testRole]}>
-                    👨‍💼 Reviewer
-                  </Text>
-                  <Text
-                    style={[
-                      styles.testCredentials,
-                      responsiveStyles.testCredentials,
-                    ]}>
-                    reviewer@test.com{"\n"}reviewer123
-                  </Text>
-                </View>
-                <View style={[styles.testCard, responsiveStyles.testCard]}>
-                  <Text style={[styles.testRole, responsiveStyles.testRole]}>
-                    🎯 Candidate
-                  </Text>
-                  <Text
-                    style={[
-                      styles.testCredentials,
-                      responsiveStyles.testCredentials,
-                    ]}>
-                    candidate@test.com{"\n"}candidate123
-                  </Text>
-                </View>
-              </View>
-            </View> */}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -194,8 +210,8 @@ const getResponsiveStyles = () => {
       paddingHorizontal: isDesktop ? wp(15) : isTablet ? wp(10) : wp(5),
     },
     scrollContent: {
-      minHeight: isDesktop ? "100%" : hp(100),
       paddingVertical: isTablet ? hp(3) : hp(2),
+      paddingBottom: hp(5),
     },
     backgroundGradient: {
       width: isDesktop ? wp(70) : wp(90),
@@ -233,6 +249,7 @@ const getResponsiveStyles = () => {
       paddingHorizontal: isDesktop ? 40 : isTablet ? 36 : 28,
       paddingVertical: isDesktop ? 40 : isTablet ? 36 : 32,
       marginBottom: isTablet ? 32 : 24,
+      width: isDesktop ? 400 : wp(85),
     },
     input: {
       paddingVertical: isDesktop ? 18 : isTablet ? 16 : 14,
@@ -242,7 +259,7 @@ const getResponsiveStyles = () => {
     },
     loginButton: {
       paddingVertical: isDesktop ? 18 : isTablet ? 16 : 14,
-      marginTop: isTablet ? 12 : 8,
+      marginTop: isTablet ? 10 : 8,
     },
     loginButtonText: {
       fontSize: isDesktop ? 18 : isTablet ? 17 : 16,
@@ -265,6 +282,13 @@ const getResponsiveStyles = () => {
     },
     forgotButtonText: {
       fontSize: isTablet ? 15 : 14,
+    },
+    fieldError: {
+      fontSize: isTablet ? 13 : 12,
+      marginTop: 4,
+    },
+    email: {
+      fontSize: isTablet ? 13 : 12,
     },
     testSection: {
       paddingHorizontal: isDesktop ? 24 : isTablet ? 20 : 16,
@@ -304,6 +328,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingBottom: 20,
   },
   backgroundGradient: {
     position: "absolute",
@@ -314,7 +339,6 @@ const styles = StyleSheet.create({
     left: -50,
   },
   content: {
-    width: "100%",
     alignSelf: "center",
   },
   header: {
@@ -365,6 +389,11 @@ const styles = StyleSheet.create({
     elevation: 20,
     borderWidth: 1,
     borderColor: "#334155",
+    ...Platform.select({
+      web: {
+        boxShadow: "0px 20px 25px rgba(0, 0, 0, 0.25)",
+      },
+    }),
   },
   input: {
     backgroundColor: "#0F172A",
@@ -374,6 +403,9 @@ const styles = StyleSheet.create({
     borderColor: "#334155",
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
     fontWeight: "400",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   loginButton: {
     backgroundColor: "#3B82F6",
@@ -384,6 +416,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: "0px 8px 16px rgba(59, 130, 246, 0.3)",
+      },
+    }),
   },
   loginButtonText: {
     color: "#FFFFFF",
@@ -410,6 +447,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#10B981",
+    ...Platform.select({
+      web: {
+        boxShadow: "none",
+      },
+    }),
   },
   signupButtonText: {
     color: "#10B981",
@@ -422,6 +464,13 @@ const styles = StyleSheet.create({
   forgotButtonText: {
     color: "#3B82F6",
     fontWeight: "500",
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
   },
   testSection: {
